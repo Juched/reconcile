@@ -37,8 +37,8 @@ def azure_ocr(im_data, key=API_KEY):
     body = im_data
 
     try:
-        conn = http.client.HTTPSConnection('westus.api.cognitive.microsoft.com')
-        conn.request("POST", "/vision/v1.0/ocr?%s" % params, body, headers)
+        conn = http.client.HTTPSConnection('reciept-pparekh.cognitiveservices.azure.com')
+        conn.request("POST", "/formrecognizer/v2.1/prebuilt/receipt/analyze?%s" % params, body, headers)
         response = conn.getresponse()
         data = response.read()
         response_dict = json.loads(data.decode("utf-8"))
@@ -83,132 +83,133 @@ def read_receipt(im_data):
     if not response_dict:
         raise ValueError('There was a problem reading your photo')
 
+    return response_dict
 
-    # Make a list of words that are numbers
-    words = []
-    for region in response_dict['regions']:
-        for line in region['lines']:        
-            words.extend(line['words'])
-    item_price_candidates = [word for word in words if is_possibly_numeric_word(word['text'])]
-    # print([price['text'] for price in item_price_candidates])
-
-
-    # Prices are usually right aligned. Get coords of right bbox edges
-    right_pts = []  # centers of bboxs' right sides
-    for item_price_candidate in item_price_candidates:
-        bbox = list(map(int,(item_price_candidate['boundingBox'].split(','))))
-        x0, y0, w, h = bbox
-        right_pts.append([x0+w, y0+h/2])
-    right_pts = np.array(right_pts)
+    # # Make a list of words that are numbers
+    # words = []
+    # for region in response_dict['regions']:
+    #     for line in region['lines']:        
+    #         words.extend(line['words'])
+    # item_price_candidates = [word for word in words if is_possibly_numeric_word(word['text'])]
+    # # print([price['text'] for price in item_price_candidates])
 
 
-    # The right margin is a line connecting several of these points
-    ransac_model, inliers = ransac(right_pts.copy(), LineModelND, min_samples=0, residual_threshold=3, max_trials=50)
-    item_prices = [c for c, inlier in zip(item_price_candidates, inliers) if inlier]
+    # # Prices are usually right aligned. Get coords of right bbox edges
+    # right_pts = []  # centers of bboxs' right sides
+    # for item_price_candidate in item_price_candidates:
+    #     bbox = list(map(int,(item_price_candidate['boundingBox'].split(','))))
+    #     x0, y0, w, h = bbox
+    #     right_pts.append([x0+w, y0+h/2])
+    # right_pts = np.array(right_pts)
 
 
-    # Compute the y-coord of every word's center
-    y_dict = []
-    for word in words:
-        bbox = list(map(int,(word['boundingBox'].split(','))))
-        x0, y0, w, h = bbox
-        y_dict.append([(y0 + h/2), word])
+    # # The right margin is a line connecting several of these points
+    # ransac_model, inliers = ransac(right_pts.copy(), LineModelND, min_samples=0, residual_threshold=3, max_trials=50)
+    # item_prices = [c for c, inlier in zip(item_price_candidates, inliers) if inlier]
+
+
+    # # Compute the y-coord of every word's center
+    # y_dict = []
+    # for word in words:
+    #     bbox = list(map(int,(word['boundingBox'].split(','))))
+    #     x0, y0, w, h = bbox
+    #     y_dict.append([(y0 + h/2), word])
 
         
-    # For each price-word, get words on the same line
-    price_lines = []
-    for item_price in item_prices:
-        bbox = list(map(int,(item_price['boundingBox'].split(','))))
-        x0, y0, w, h = bbox
-        y = y0 + h/2
-        ordered_word_dict = sorted(y_dict, key=lambda x: abs(x[0] - y))  # all words, ordered by y-dist from this word
+    # # For each price-word, get words on the same line
+    # price_lines = []
+    # for item_price in item_prices:
+    #     bbox = list(map(int,(item_price['boundingBox'].split(','))))
+    #     x0, y0, w, h = bbox
+    #     y = y0 + h/2
+    #     ordered_word_dict = sorted(y_dict, key=lambda x: abs(x[0] - y))  # all words, ordered by y-dist from this word
         
-        # Select words with similar y-coord
-        margin = h/2
-        same_line_words = [word for word_y, word in ordered_word_dict
-                           if abs(word_y-y) < margin and
-                           word['text'] != item_price['text']]
-        price_lines.append([item_price] + same_line_words)
-    price_lines = sorted(price_lines, key=mean_line_height)
+    #     # Select words with similar y-coord
+    #     margin = h/2
+    #     same_line_words = [word for word_y, word in ordered_word_dict
+    #                        if abs(word_y-y) < margin and
+    #                        word['text'] != item_price['text']]
+    #     price_lines.append([item_price] + same_line_words)
+    # price_lines = sorted(price_lines, key=mean_line_height)
 
 
-    # Figure out what the prices are
-    items = []
-    for line in price_lines:
-        price = line[0]
-        other_words = line[1:]
-        other_words = sorted(other_words, 
-                             key=lambda x: int(x['boundingBox'].split(',')[0]))
+    # # Figure out what the prices are
+    # items = []
+    # for line in price_lines:
+    #     price = line[0]
+    #     other_words = line[1:]
+    #     other_words = sorted(other_words, 
+    #                          key=lambda x: int(x['boundingBox'].split(',')[0]))
         
-        if len(price['text']) > 3:  # Got the whole price in one word
-            try:
-                price = convert_to_float(price['text'])
-            except ValueError:
-                # this probably means a non-price numerical word in the price column,
-                # e.g., a date
-                continue  
-            item_name = ' '.join([word['text'] for word in other_words])
+    #     if len(price['text']) > 3:  # Got the whole price in one word
+    #         try:
+    #             price = convert_to_float(price['text'])
+    #         except ValueError:
+    #             # this probably means a non-price numerical word in the price column,
+    #             # e.g., a date
+    #             continue  
+    #         item_name = ' '.join([word['text'] for word in other_words])
             
-        elif len(price['text']) == 2:  # Probably got cents, dollars in different word
-            try:
-                cents = convert_to_float(price['text'].replace(',','').replace('.',''))
-            except ValueError:
-                # raise NotImplementedError
-                continue
+    #     elif len(price['text']) == 2:  # Probably got cents, dollars in different word
+    #         try:
+    #             cents = convert_to_float(price['text'].replace(',','').replace('.',''))
+    #         except ValueError:
+    #             # raise NotImplementedError
+    #             continue
             
-            # Get other number-words on the same line
-            number_words = [word for word in other_words
-                            if is_possibly_numeric_word(word['text'])]
-            if not number_words:  # No other numbers on this line other than 'price'
-                # raise NotImplementedError
-                continue
+    #         # Get other number-words on the same line
+    #         number_words = [word for word in other_words
+    #                         if is_possibly_numeric_word(word['text'])]
+    #         if not number_words:  # No other numbers on this line other than 'price'
+    #             # raise NotImplementedError
+    #             continue
             
-            dollar_word = number_words[-1]
-            try:
-                dollars = int(dollar_word['text'].replace(',','').replace('.',''))
-            except ValueError:
-                # raise NotImplementedError
-                continue
+    #         dollar_word = number_words[-1]
+    #         try:
+    #             dollars = int(dollar_word['text'].replace(',','').replace('.',''))
+    #         except ValueError:
+    #             # raise NotImplementedError
+    #             continue
             
-            price = dollars + 0.01 * cents
-            item_name = ' '.join([w['text'] for w in other_words if w != dollar_word])
+    #         price = dollars + 0.01 * cents
+    #         item_name = ' '.join([w['text'] for w in other_words if w != dollar_word])
             
         
-        item_name = item_name.replace(',', '')  # remove spurious commas (there are a lot)
-        item_name = item_name.strip()
-        if price < 5000 and price >= 0:
-            items.append((item_name, price))
+    #     item_name = item_name.replace(',', '')  # remove spurious commas (there are a lot)
+    #     item_name = item_name.strip()
+    #     if price < 5000 and price >= 0:
+    #         items.append((item_name, price))
         
         
-    # Adapt for API/json
-    receipt_contents = {'items': []}
-    for item, price in items:
+    # # Adapt for API/json
+    # receipt_contents = {'items': []}
+    # for item, price in items:
         
-        if item.lower().startswith('total'):  # TODO: include common misspellings
-            receipt_contents['total'] = price
-        elif 'subtotal' in item.lower().replace('-','').replace(' ',''):
-            receipt_contents['subtotal'] = price
-        elif 'tax' in item.lower():
-            receipt_contents['tax'] = price
-        else:
-            item_dict = {'name': item, 'price': price, 'quantity': 1}
-            receipt_contents['items'].append(item_dict)
+    #     if item.lower().startswith('total'):  # TODO: include common misspellings
+    #         receipt_contents['total'] = price
+    #     elif 'subtotal' in item.lower().replace('-','').replace(' ',''):
+    #         receipt_contents['subtotal'] = price
+    #     elif 'tax' in item.lower():
+    #         receipt_contents['tax'] = price
+    #     else:
+    #         item_dict = {'name': item, 'price': price, 'quantity': 1}
+    #         receipt_contents['items'].append(item_dict)
 
     
-    # Handle cases where required fields are absent
-    if 'total' not in receipt_contents.keys():
-        # the total often has the largest font
-        # the total is usually the largest numerical word
-        # maybe it's called "due" or something
-        pass
-    if 'subtotal' not in receipt_contents.keys():
-        pass
-    if 'tax' not in receipt_contents.keys():
-        pass
-    if not receipt_contents['items']:
-        pass  # no items
+    # # Handle cases where required fields are absent
+    # if 'total' not in receipt_contents.keys():
+    #     # the total often has the largest font
+    #     # the total is usually the largest numerical word
+    #     # maybe it's called "due" or something
+    #     pass
+    # if 'subtotal' not in receipt_contents.keys():
+    #     pass
+    # if 'tax' not in receipt_contents.keys():
+    #     pass
+    # if not receipt_contents['items']:
+    #     pass  # no items
 
-    return receipt_contents
+    # return receipt_contents
 
 
 

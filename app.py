@@ -1,7 +1,7 @@
 from flask import (
     Flask , Blueprint, flash, g, redirect, render_template, request, jsonify, session, url_for
 )
-from preprocess import preprocess_image
+
 from read_receipt_image import read_receipt
 import io
 import matplotlib
@@ -18,11 +18,9 @@ app.config['UPLOAD_FOLDER'] = UPLOAD_FOLDER
 def im_to_json(im):
     """Here's where the magic happens"""
 
-    preprocessed_im = preprocess_image(im)
-
 
     buf = io.BytesIO()
-    plt.imsave(buf, preprocessed_im)
+    plt.imsave(buf, im)
     im_data = buf.getvalue()
 
     bill_dict = read_receipt(im_data)
@@ -38,7 +36,9 @@ def home():
     print(request.files)
     if 'file' in request.files:
         im = plt.imread(request.files['file'])
-        return im_to_json(im)
+        bill = im_to_json(im)
+        print(bill)
+        return bill
     else:
         # return im_to_json(None)
         print('Received request with no image attached')

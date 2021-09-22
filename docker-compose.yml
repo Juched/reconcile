@@ -8,6 +8,9 @@ services:
             dockerfile: Dockerfile-flask
         volumes:
             - "./:/app"  
+        environment:
+            - AZURE_CV_KEY=${KEY}
+
     nginx:
         image: webapp-nginx
         build:
