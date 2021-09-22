@@ -1,0 +1,33 @@
+
+:root {
+    --primary: #CFCCD6;
+    --secondary: #4C6085;
+    --tertiary: #49A078;
+    --quaternary:#E85D75;
+    --quinternary: #F39237;
+}
+
+osu-index {
+    display: block;
+    height: 100%;
+}
+
+#main-content {
+    height: 100%;
+}
+  
+
+body {
+    background-color: var(--primary);
+    height: 100vh;
+    font-size: 14px;
+    font-family: "Nova Mono", monospace;
+}
+
+.card {
+    background-color: var(--secondary);
+    border: 2px solid var(--quinternary);
+    border-radius: 9px;
+    margin: 5px;
+    padding: 5px;
+  }

@@ -1,0 +1,6 @@
+Flask
+uWSGI
+numpy
+matplotlib
+scikit-image
+scipy
