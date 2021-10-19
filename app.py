@@ -7,6 +7,10 @@ import io
 import matplotlib
 matplotlib.use('agg')
 import matplotlib.pyplot as plt
+import pickle
+import uuid
+
+
 
 
 UPLOAD_FOLDER = 'uploads'
@@ -25,7 +29,7 @@ def im_to_json(im):
 
     bill_dict = read_receipt(im_data)
 
-    return jsonify(bill_dict)
+    return bill_dict
 
 @app.route('/')
 def index():
@@ -37,8 +41,13 @@ def home():
     if 'file' in request.files:
         im = plt.imread(request.files['file'])
         bill = im_to_json(im)
+        print(type(bill))
         print(bill)
-        return bill
+        unique_filename = uuid.uuid4()
+        file_pi = open(f'{unique_filename.hex}.receipt', 'wb') 
+        pickle.dump(bill, file_pi)
+        file_pi.close()
+        return "Completed"
     else:
         # return im_to_json(None)
         print('Received request with no image attached')

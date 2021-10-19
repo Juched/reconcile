@@ -9,6 +9,9 @@ from skimage.measure import LineModelND, ransac
 import matplotlib
 matplotlib.use('agg')
 import matplotlib.pyplot as plt
+from azure.ai.formrecognizer import FormRecognizerClient
+from azure.core.credentials import AzureKeyCredential
+
 
 
 # https://azure.microsoft.com/en-us/try/cognitive-services/my-apis/
@@ -21,31 +24,33 @@ def azure_ocr(im_data, key=API_KEY):
     """
     Send image data to azure computer vision api for OCR.
     """
+
+
+    endpoint = "https://reciept-pparekh.cognitiveservices.azure.com"
+    credential = AzureKeyCredential(key)
+
+    form_recognizer_client = FormRecognizerClient(endpoint, credential)
+
+    receipt = im_data
+
+    poller = form_recognizer_client.begin_recognize_receipts(receipt)
+    result = poller.result()
+
+    retRept = []
+    for receipt in result:
+        for name, field in receipt.fields.items():
+            if name == "Items":
+                print("Receipt Items:")
+                for idx, items in enumerate(field.value):
+                    print("...Item #{}".format(idx+1))
+                    for item_name, item in items.value.items():
+                        print("......{}: {} has confidence {}".format(item_name, item.value, item.confidence))
+                        retRept.append([item_name, item.value, item.confidence])
+            else:
+                print("{}: {} has confidence {}".format(name, field.value, field.confidence))
+                retRept.append([name, field.value, field.confidence])
+    return retRept
     
-    headers = {
-    #     'Content-Type': 'application/json',
-        'Content-Type': 'application/octet-stream',   
-        'Ocp-Apim-Subscription-Key': key,
-    }
-
-    params = urllib.parse.urlencode({
-        'language': 'unk',
-        'detectOrientation ': 'true',
-    })
-
-    # body = "{'url':'http://i3.kym-cdn.com/photos/images/newsfeed/001/217/729/f9a.jpg'}"
-    body = im_data
-
-    try:
-        conn = http.client.HTTPSConnection('reciept-pparekh.cognitiveservices.azure.com')
-        conn.request("POST", "/formrecognizer/v2.1/prebuilt/receipt/analyze?%s" % params, body, headers)
-        response = conn.getresponse()
-        data = response.read()
-        response_dict = json.loads(data.decode("utf-8"))
-        conn.close()
-        return response_dict
-    except Exception as e:
-        print("[Errno {0}] {1}".format(e.errno, e.strerror))
     
 
     
